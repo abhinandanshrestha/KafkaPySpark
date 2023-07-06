@@ -1,4 +1,10 @@
 
+![Overview](https://github.com/abhinandanshrestha/KafkaPySpark/assets/43780258/c0eb1b08-d1bf-4d84-8999-430c026fbdda)
+<p align="center">
+  <img src="https://github.com/abhinandanshrestha/KafkaPySpark/assets/43780258/05ad74fe-7dd4-4d19-b860-5bcf667abb9f" alt="image1" width="400" />
+  <img src="https://github.com/abhinandanshrestha/KafkaPySpark/assets/43780258/cd513496-0313-4be3-b0b7-286c1f3542bc" alt="image2" width="400" />
+</p>
+
 
 ## 1. Run zookeper: 
 /home/abhi/Kafka/kafka_2.12-2.3.0/bin/zookeeper-server-start.sh /home/abhi/Kafka/kafka_2.12-2.3.0/config/zookeeper.properties
@@ -12,7 +18,7 @@
 ## 4. Create Topic:
 /home/abhi/Kafka/kafka_2.12-2.3.0/bin/kafka-topics.sh --create --topic iot --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 
-## 4. Make sure localip of windows is mapped to IP of WSL:
+## 4. Make sure localip of windows is mapped to IP of WSL. Also make sure you enter IP of Windows in the Sensor Logger:
 Listen on ipv4:             Connect to ipv4:
 
 Address         Port        Address         Port
