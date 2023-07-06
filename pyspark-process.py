@@ -1,8 +1,8 @@
 from pyspark.streaming import StreamingContext
 from pyspark.sql import SparkSession
-# from pyspark.sql.functions import from_json,lit
-from pyspark.sql.functions import col,from_json,explode
-from pyspark.sql.types import DoubleType,StringType,IntegerType,StructField,StructType,LongType,ArrayType
+from pyspark.sql.functions import from_json,explode,lit,monotonically_increasing_id,col
+from pyspark.sql.types import DoubleType,StringType,StructField,StructType,LongType,ArrayType
+
 
 # Define my scala and spark version
 scala_version = '2.12'
@@ -11,18 +11,18 @@ spark_version = '3.4.1'
 # TODO: Ensure match above values match the correct versions
 packages = [
     f'org.apache.spark:spark-sql-kafka-0-10_{scala_version}:{spark_version}',
-    'org.apache.kafka:kafka-clients:3.2.1'
-    #  'com.datastax.spark:spark-cassandra-connector_2.12:3.1.0'
+    'org.apache.kafka:kafka-clients:3.2.1',
+     'com.datastax.spark:spark-cassandra-connector_2.12:3.1.0'
 ]
 
 spark = SparkSession.builder \
     .master("local[*]") \
     .appName("KafkaIntegrationApp") \
     .config("spark.jars.packages", ",".join(packages))\
+    .config("spark.cassandra.connection.host", "localhost") \
+    .config("spark.cassandra.connection.port", "9042") \
+    .config("spark.sql.extensions", "com.datastax.spark.connector.CassandraSparkExtensions") \
     .getOrCreate()
-    # .config("spark.cassandra.connection.host", "localhost") \
-    # .config("spark.cassandra.connection.port", "9042") \
-    # .config("spark.sql.extensions", "com.datastax.spark.connector.CassandraSparkExtensions") \
     
 
 # Create a StreamingContext with a batch interval (e.g., 1 second)
@@ -63,7 +63,6 @@ schema = StructType([
 # Apply the schema to the DataFrame
 df = df.select(from_json(df.value, schema).alias("data")).select("data.*")
 
-
 # Explode the payload array to create separate rows for each gyroscope value
 df = df.select("messageId", "sessionId", "deviceId", explode("payload").alias("payload"))
 
@@ -80,10 +79,39 @@ df = df.select(
     "payload.time"
 )
 
-# # Print the data to the console
+df = df.withColumnRenamed("messageId", "messageid")
+df = df.withColumnRenamed("sessionId", "sessionid")
+df = df.withColumnRenamed("deviceId", "deviceid")
+
+# Specify the Cassandra keyspace and table
+cassandra_keyspace = "iot"
+cassandra_table = "gyro"
+
+
+# Save the processed data to Cassandra
+def save_to_cassandra(batch_df, batch_id):
+    # Add the primary key column to the DataFrame
+    batch_df_with_key = batch_df.withColumn("id", lit(batch_id) + monotonically_increasing_id())
+
+    batch_df_with_key.write \
+        .format("org.apache.spark.sql.cassandra") \
+        .mode("append") \
+        .options(table="gyro", keyspace="iot") \
+        .save()
+
+# Write the streaming data to Cassandra
 query = df.writeStream \
-    .outputMode("append") \
-    .format("console") \
+    .format("org.apache.spark.sql.cassandra") \
+    .option("keyspace", cassandra_keyspace) \
+    .option("table", cassandra_table) \
+    .option("checkpointLocation", "/home/abhi/Projects/2/cheeckpoint") \
+    .foreachBatch(save_to_cassandra) \
     .start()
+
+# Print the data to the console
+# query = df.writeStream \
+#     .outputMode("append") \
+#     .format("console") \
+#     .start()
 
 query.awaitTermination()
